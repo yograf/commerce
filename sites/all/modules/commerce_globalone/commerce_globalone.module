@@ -1,0 +1,154 @@
+<?php
+
+/**
+ * @file
+ * Implements GlobalOne payment services for use in Drupal Commerce.
+ */
+
+// Authorize.Net transaction mode definitions:
+//define('AUTHNET_TXN_MODE_LIVE', 'live');
+//define('AUTHNET_TXN_MODE_LIVE_TEST', 'live_test');
+//define('AUTHNET_TXN_MODE_DEVELOPER', 'developer');
+
+
+/*
+
+$paymentParams['ORDERID'] = rand(10,10000);
+$paymentParams['AMOUNT'] = 1000;
+$paymentParams['CURRENCY'] = 'USD';
+$paymentParams['CARDNUMBER'] = '4444 3333 2222 1111';
+$paymentParams['CARDHOLDERNAME'] = 'John Doe Visa';
+$paymentParams['MONTH'] = '09';
+$paymentParams['YEAR'] = '16';
+$paymentParams['CVV'] = '123';
+$r = new CommerceGlobalonePost('https://testpayments.globalone.me/merchant/xmlpayment', $paymentParams);
+$r-> sendPayment();
+
+
+ 
+
+
+ */
+
+/**
+ * Implements hook_menu().
+*/
+function commerce_globalone_menu() {
+  $items = array();
+
+
+  return $items;
+}
+
+function commerce_globalone_test() {
+$paymentParams['ORDERID'] = rand(10,10000);
+$paymentParams['AMOUNT'] = 1000;
+$paymentParams['CURRENCY'] = 'CAD';
+$paymentParams['CARDNUMBER'] = '4444 3333 2222 1111';
+$paymentParams['CARDHOLDERNAME'] = 'John Doe Visa';
+$paymentParams['MONTH'] = '09';
+$paymentParams['YEAR'] = '16';
+$paymentParams['CVC'] = '123';
+$url = 'https://testpayments.globalone.me/merchant/xmlpayment';
+dpm($paymentParams);
+}
+
+/**
+ * Implements hook_commerce_payment_method_info().
+ */
+function commerce_globalone_commerce_payment_method_info() {
+  $payment_methods = array();
+
+  $payment_methods['globalone'] = array(
+    'base' => 'commerce_globalone_cc',
+    'title' => t('GlobalONE - Credit Card'),
+    'short_title' => t('GlobalONE CC'),
+    'display_title' => t('Credit card'),
+    'description' => t('Integrates GlobalONE CC transactions.'),
+  );
+
+  return $payment_methods;
+}
+
+/**
+ * Payment method callback: settings form.
+ */
+function commerce_globalone_cc_settings_form($settings = NULL) {
+  module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+
+  // Merge default settings into the stored settings array.
+
+  $form = array();
+
+  $form['login'] = array(
+    '#type' => 'textfield',
+    '#title' => t('API Login ID'),
+    '#description' => t('Your API Login ID is different from the username you use to login to your Authorize.Net account. Once you login, browse to your Account tab and click the <em>API Login ID and Transaction Key</em> link to find your API Login ID. If you are using a new Authorize.Net account, you may still need to generate an ID.'),
+    '#default_value' => $settings['login'],
+    '#required' => TRUE,
+  );
+  return $form;
+}
+
+/**
+ * Payment method callback: checkout form.
+ */
+function commerce_globalone_cc_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+  module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+
+  // Prepare the fields to include on the credit card form.
+  $fields = array(
+    'code' => '',
+  );
+
+  // Add the credit card types array if necessary.
+  if (isset($payment_method['settings']['card_types'])) {
+    $card_types = array_diff(array_values($payment_method['settings']['card_types']), array(0));
+
+    if (!empty($card_types)) {
+      $fields['type'] = $card_types;
+    }
+  }
+
+  return commerce_payment_credit_card_form($fields);
+}
+
+/**
+ * Payment method callback: checkout form validation.
+ */
+function commerce_globalone_cc_submit_form_validate($payment_method, $pane_form, $pane_values, $order, $form_parents = array()) {
+  // If the customer specified a card on file, skip the normal validation.
+  if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
+    !empty($pane_values['cardonfile']) && $pane_values['cardonfile'] !== 'new') {
+    return;
+  }
+
+  module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+
+  // Validate the credit card fields.
+  $settings = array(
+    'form_parents' => array_merge($form_parents, array('credit_card')),
+  );
+
+  if (!commerce_payment_credit_card_validate($pane_values['credit_card'], $settings)) {
+    return FALSE;
+  }
+}
+
+
+/**
+ * Payment method callback: checkout form submission.
+ */
+function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
+
+$paymentParams['ORDERID'] = rand(10,10000);
+$paymentParams['AMOUNT'] = 1000;
+$paymentParams['CURRENCY'] = 'USD';
+$paymentParams['CARDNUMBER'] = '4444 3333 2222 1111';
+$paymentParams['CARDHOLDERNAME'] = 'John Doe Visa';
+$paymentParams['MONTH'] = '09';
+$paymentParams['YEAR'] = '16';
+$paymentParams['CVV'] = '123';
+$r = new CommerceGlobalonePost('https://testpayments.globalone.me/merchant/xmlpayment', $paymentParams);
+$r-> sendPayment();
+}
