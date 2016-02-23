@@ -1,9 +1,0 @@
-<?php
-Class CommerceGlobalonePost {
-
-
-	public function __construct($paymentURL,$paymentParams) {
-    print 'dfdf';
-	}
-
-}

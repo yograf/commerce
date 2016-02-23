@@ -1,0 +1,5 @@
+name = GlobalOne Terminal
+description = Implements GlobalOne payment terminal.
+package = Commerce (contrib)
+dependencies[] = commerce_globalone
+core = 7.x

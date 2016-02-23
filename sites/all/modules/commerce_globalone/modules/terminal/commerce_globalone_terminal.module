@@ -1,0 +1,172 @@
+<?php 
+
+
+/**
+ * Implements hook_menu().
+ */
+function commerce_globalone_terminal_menu() {
+  $path = 'estore/terminal';
+  $items = array();
+  $items[$path] = array(
+    'title' => 'GlobalONE Terminal',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('commerce_globalone_terminal_form'),
+    'access callback' => TRUE,
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_commerce_order_status_info().
+ */
+function commerce_globalone_terminal_commerce_order_status_info() {
+  return array(
+    'globalone_terminal' => array(
+      'name' => 'globalone_terminal_completed',
+      'title' => t('GlobalONE terminal completed'),
+      'state' => 'completed',
+    ),
+
+  );
+
+}
+
+/**
+ * Implements hook_commerce_line_item_type_info().
+ */
+function commerce_globalone_terminal_commerce_line_item_type_info() {
+
+  $line_item_types = array();
+
+  $line_item_types['globalone_terminal'] = array(
+    'name' => t('GlobalONE Terminal'),
+    'description' => t('This line item is globalone.'),
+    'product' => FALSE,
+  );
+
+  return $line_item_types;
+
+}
+
+
+/**
+ * GlobalONE callback.
+ */
+function commerce_globalone_terminal_form($form, &$form_state) {
+  // Ensure this include file is loaded when the form is rebuilt from the cache.
+  //$form_state['build_info']['files']['form'] = drupal_get_path('module', 'commerce_payment') . '/includes/commerce_payment.forms.inc';
+  if (empty($form_state['order'])) {
+    global $user;
+    $order = commerce_order_new($user->uid, 'globalone_terminal_completed');
+    $form_state['order'] = $order;
+  }
+  else {
+    $order = $form_state['order'];
+  }
+  $payment_method = commerce_payment_method_load('globalone');
+  $default_currency_code = commerce_default_currency();
+  $form['payment_terminal'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Payment terminal: @title', array('@title' => $payment_method['title'])),
+    '#attributes' => array('class' => array('payment-terminal')),
+  );
+  $form['payment_terminal']['amount'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Amount'),
+    '#required' => TRUE,
+    '#default_value' => '0.00',
+    '#size' => 10,
+    '#prefix' => '<div class="payment-terminal-amount">',
+  ); 
+
+  $form['payment_terminal']['description'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Description'),
+  ); 
+  // Build a currency options list from all enabled currencies.
+  $options = array();
+
+  foreach (commerce_currencies(TRUE) as $currency_code => $currency) {
+    $options[$currency_code] = check_plain($currency['code']);
+  }
+  $form['payment_terminal']['currency_code'] = array(
+    '#type' => 'select',
+    '#options' => $options,
+    '#default_value' => $default_currency_code,
+    '#suffix' => '</div>',
+  );
+  $terminal_values = !empty($form_state['values']['payment_details']) ? $form_state['values']['payment_details'] : array();
+  $form['payment_terminal']['payment_details'] = commerce_globalone_cc_submit_form($payment_method, $terminal_values, NULL, $order, TRUE);
+  $form['payment_terminal']['payment_details']['#tree'] = TRUE;
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#name' => 'cc_submit',
+    '#value' => t('Processs'),
+  );
+  return $form;
+}
+function commerce_globalone_terminal_form_validate($form, &$form_state) {
+  //$form_state['rebuild'] = TRUE;
+  $order = $form_state['order'];
+  //commerce_globalone_cc_submit_form_validate('globalone', $form['payment_terminal']['payment_details'], $form_state['values']['payment_details'], $order, array('payment_details'));
+
+}
+
+
+function commerce_globalone_terminal_add_line_item_to_order($order, $charge, $title) {
+  $line_item = entity_create('commerce_line_item', array(
+    'type' => 'globalone_terminal', 
+    'order_id' => $order->order_id, 
+    'quantity' => 1,
+    'line_item_label' => $title,
+  ));
+
+
+  $line_item->commerce_unit_price = array(
+    'und' => array(
+      '0' => $charge,
+    )
+  );
+
+  $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+
+  if (!is_null($line_item_wrapper->commerce_unit_price->value())) {
+    // Add the base price to the components array.
+    if (!commerce_price_component_load($line_item_wrapper->commerce_unit_price->value(), 'base_price')) {
+      $line_item_wrapper->commerce_unit_price->data = commerce_price_component_add(
+        $line_item_wrapper->commerce_unit_price->value(), 
+        'base_price', 
+        $line_item_wrapper->commerce_unit_price->value(), 
+        TRUE
+      );
+    }
+  }
+  $line_item_wrapper->save();
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $order_wrapper->commerce_line_items[] = $line_item;
+  $order_wrapper->save();
+
+}
+function commerce_globalone_terminal_form_submit($form, &$form_state) {
+  $order = $form_state['order'];
+  commerce_order_save($order);
+
+  // Explode variables from form_state values array.
+  extract($form_state['values']);
+
+  $charge = array(
+    'amount' => commerce_currency_decimal_to_amount($amount, $currency_code),
+    'currency_code' => $currency_code,
+  );
+  $description = empty($description) ? t('GlobalONE Terminal') : $description;
+
+  commerce_globalone_terminal_add_line_item_to_order($order, $charge, $description);
+  $payment_method = commerce_payment_method_instance_load('globalone|commerce_payment_globalone');
+  $details_form = !empty($form['payment_terminal']['payment_details']) ? $form['payment_terminal']['payment_details'] : array();
+  $details_values = !empty($form_state['values']['payment_details']) ? $form_state['values']['payment_details'] : array();
+  dpm($order);
+  return '';
+  $result = commerce_globalone_cc_submit_form_submit($payment_method, $details_form, $details_values, $order, $charge);
+}

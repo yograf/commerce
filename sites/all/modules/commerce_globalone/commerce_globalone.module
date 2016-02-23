@@ -5,34 +5,11 @@
  * Implements GlobalOne payment services for use in Drupal Commerce.
  */
 
-// Authorize.Net transaction mode definitions:
-//define('AUTHNET_TXN_MODE_LIVE', 'live');
-//define('AUTHNET_TXN_MODE_LIVE_TEST', 'live_test');
-//define('AUTHNET_TXN_MODE_DEVELOPER', 'developer');
 
-
-/*
-
-$paymentParams['ORDERID'] = rand(10,10000);
-$paymentParams['AMOUNT'] = 1000;
-$paymentParams['CURRENCY'] = 'USD';
-$paymentParams['CARDNUMBER'] = '4444 3333 2222 1111';
-$paymentParams['CARDHOLDERNAME'] = 'John Doe Visa';
-$paymentParams['MONTH'] = '09';
-$paymentParams['YEAR'] = '16';
-$paymentParams['CVV'] = '123';
-$r = new CommerceGlobalonePost('https://testpayments.globalone.me/merchant/xmlpayment', $paymentParams);
-$r-> sendPayment();
-
-
- 
-
-
- */
 
 /**
  * Implements hook_menu().
-*/
+ */
 function commerce_globalone_menu() {
   $items = array();
 
@@ -40,18 +17,6 @@ function commerce_globalone_menu() {
   return $items;
 }
 
-function commerce_globalone_test() {
-$paymentParams['ORDERID'] = rand(10,10000);
-$paymentParams['AMOUNT'] = 1000;
-$paymentParams['CURRENCY'] = 'CAD';
-$paymentParams['CARDNUMBER'] = '4444 3333 2222 1111';
-$paymentParams['CARDHOLDERNAME'] = 'John Doe Visa';
-$paymentParams['MONTH'] = '09';
-$paymentParams['YEAR'] = '16';
-$paymentParams['CVC'] = '123';
-$url = 'https://testpayments.globalone.me/merchant/xmlpayment';
-dpm($paymentParams);
-}
 
 /**
  * Implements hook_commerce_payment_method_info().
@@ -76,15 +41,13 @@ function commerce_globalone_commerce_payment_method_info() {
 function commerce_globalone_cc_settings_form($settings = NULL) {
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
 
-  // Merge default settings into the stored settings array.
-
   $form = array();
 
   $form['login'] = array(
     '#type' => 'textfield',
     '#title' => t('API Login ID'),
     '#description' => t('Your API Login ID is different from the username you use to login to your Authorize.Net account. Once you login, browse to your Account tab and click the <em>API Login ID and Transaction Key</em> link to find your API Login ID. If you are using a new Authorize.Net account, you may still need to generate an ID.'),
-    '#default_value' => $settings['login'],
+    // '#default_value' => $settings['login'],
     '#required' => TRUE,
   );
   return $form;
@@ -93,13 +56,17 @@ function commerce_globalone_cc_settings_form($settings = NULL) {
 /**
  * Payment method callback: checkout form.
  */
-function commerce_globalone_cc_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+function commerce_globalone_cc_submit_form($payment_method, $pane_values, $checkout_pane, $order, $owner = FALSE) {
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
 
   // Prepare the fields to include on the credit card form.
   $fields = array(
     'code' => '',
   );
+  // Add owner field if set $owner to true.
+  if ($owner) {
+    $fields['owner'] = '';
+  }
 
   // Add the credit card types array if necessary.
   if (isset($payment_method['settings']['card_types'])) {
@@ -117,11 +84,6 @@ function commerce_globalone_cc_submit_form($payment_method, $pane_values, $check
  * Payment method callback: checkout form validation.
  */
 function commerce_globalone_cc_submit_form_validate($payment_method, $pane_form, $pane_values, $order, $form_parents = array()) {
-  // If the customer specified a card on file, skip the normal validation.
-  if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
-    !empty($pane_values['cardonfile']) && $pane_values['cardonfile'] !== 'new') {
-    return;
-  }
 
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
 
@@ -135,20 +97,69 @@ function commerce_globalone_cc_submit_form_validate($payment_method, $pane_form,
   }
 }
 
+function commerce_globalone_new_transaction($transaction_data) {
+
+    $transaction = commerce_payment_transaction_new('globalone', $transaction_data['order_id']);
+    $transaction->instance_id = $transaction_data['payment_method']['instance_id'];
+    $transaction->remote_id = 'dd';
+    $transaction->amount = $transaction_data['charge']['amount'];
+    $transaction->currency_code = $transaction_data['charge']['currency_code'];
+    $transaction->payload[REQUEST_TIME] = 'dfd';
+
+      $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+    // Store the type of transaction in the remote status.
+    $transaction->remote_status = 'asdfds';
+
+    // Build a meaningful response message.
+    $message = array(
+      'message',
+    );
+
+    $transaction->message = implode('<br />', $message);
+
+    // Save the transaction information.
+    commerce_payment_transaction_save($transaction);
+
+}
 
 /**
  * Payment method callback: checkout form submission.
  */
-function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
+function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge = NULL) {
+  $payment_settings = $payment_method['settings'];
+  $credit_card = $pane_values['credit_card'];
+  // Format order total for transaction.
+  if (!isset($charge)) {
+    $wrapper = entity_metadata_wrapper('commerce_order', $order);
+    $charge = commerce_line_items_total($wrapper->commerce_line_items);
+  }
+  
 
-$paymentParams['ORDERID'] = rand(10,10000);
-$paymentParams['AMOUNT'] = 1000;
-$paymentParams['CURRENCY'] = 'USD';
-$paymentParams['CARDNUMBER'] = '4444 3333 2222 1111';
-$paymentParams['CARDHOLDERNAME'] = 'John Doe Visa';
-$paymentParams['MONTH'] = '09';
-$paymentParams['YEAR'] = '16';
-$paymentParams['CVV'] = '123';
-$r = new CommerceGlobalonePost('https://testpayments.globalone.me/merchant/xmlpayment', $paymentParams);
-$r-> sendPayment();
+  $params['ORDERID'] = $order->order_id;
+  $params['AMOUNT'] = $charge['amount'];
+  $params['CURRENCY'] = $charge['currency_code'];
+  $params['CARDNUMBER'] = $credit_card['number'];
+  $params['CARDHOLDERNAME'] = $credit_card['owner'];
+  $params['MONTH'] = $credit_card['exp_month'];
+  $params['YEAR'] = $credit_card['exp_year'];
+  $params['CVV'] = $credit_card['code'];
+  $globalone_post = new CommerceGlobalonePost('https://testpayments.globalone.me/merchant/xmlpayment', $params);
+  $r = $globalone_post->sendPayment();
+  dpm($r);
+
+
+
+
+
+  $transaction = array(
+    'charge' => $charge,
+    'payment_method' => $payment_method,
+    'order_id' => $order->order_id,
+  );
+  commerce_globalone_new_transaction($transaction);
+  //'amount' => number_format(commerce_currency_amount_to_decimal($charge['amount'], $charge['currency_code']), 2, '.', ''),
+
+
+
+
 }
