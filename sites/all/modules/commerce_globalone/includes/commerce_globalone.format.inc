@@ -281,12 +281,11 @@ return $date;
     $out = array();
 
     $out['ORDERID'] = $params['ORDERID'];
-    $out['TERMINALID'] = $this->_terminal['TerminalID'];
+    $out['TERMINALID'] = $this->_terminal['terminal_id'];
     $out['AMOUNT'] = $params['AMOUNT'];
     $out['DATETIME'] = $this->_postDateTime;
     $out['CARDNUMBER'] = $this->cleanCardNumber($params['CARDNUMBER']);
-    //$out['CARDTYPE'] = $this->getCardType($params['CARDNUMBER']);
-    $out['CARDTYPE'] = 'VISA';
+    $out['CARDTYPE'] = $params['CARDTYPE'];
     $out['CARDEXPIRY'] = $this->cleanExpiryDate($params['MONTH'],$params['YEAR']);
     $out['CARDHOLDERNAME'] = $params['CARDHOLDERNAME'];
     $out['HASH'] = $this->_postHash;

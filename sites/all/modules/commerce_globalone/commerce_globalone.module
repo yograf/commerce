@@ -5,6 +5,8 @@
  * Implements GlobalOne payment services for use in Drupal Commerce.
  */
 
+define('GLOBALONE_TEST_URL', 'https://testpayments.globalone.me/merchant/xmlpayment');
+define('GLOBALONE_LIVE_URL', 'https://payments.globalone.me/merchant/xmlpayment');
 
 
 /**
@@ -16,7 +18,6 @@ function commerce_globalone_menu() {
 
   return $items;
 }
-
 
 /**
  * Implements hook_commerce_payment_method_info().
@@ -35,28 +36,152 @@ function commerce_globalone_commerce_payment_method_info() {
   return $payment_methods;
 }
 
+function commerce_globalone_cc_default_settings() {
+  return array(
+    'mode' => 'test',
+    'terminal' => array(
+      'terminal_path' => 'estore/terminal',
+    ),
+    'live' => array(
+      'currency' => '',
+      'terminal_id' => '',
+      'secret' => '',
+    ),
+    'test' => array(
+      'terminal_id' => '33001',
+    ),
+    'card_types' => array(),
+    'log' => array('request' => '0', 'response' => '0'),
+  );
+}
+
 /**
  * Payment method callback: settings form.
  */
 function commerce_globalone_cc_settings_form($settings = NULL) {
+  $settings = (array) $settings + commerce_globalone_cc_default_settings();
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
 
   $form = array();
 
-  $form['login'] = array(
-    '#type' => 'textfield',
-    '#title' => t('API Login ID'),
-    '#description' => t('Your API Login ID is different from the username you use to login to your Authorize.Net account. Once you login, browse to your Account tab and click the <em>API Login ID and Transaction Key</em> link to find your API Login ID. If you are using a new Authorize.Net account, you may still need to generate an ID.'),
-    // '#default_value' => $settings['login'],
+  $form['mode'] = array(
+    '#type' => 'select',
+    '#title' => t('Choose Transaction mode'),
+    '#description' => t('live or test'),
+    '#default_value' => $settings['mode'],
+    '#options' => array(
+      'test' => t('Test'), 
+      'live' => t('Live'), 
+    ),
     '#required' => TRUE,
   );
+  $form['test'] = array(
+    '#type' => 'container',
+    '#title' => t('test cards'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-parameter-payment-method-settings-payment-method-settings-mode"]' => array('value' => 'test'),
+      ),
+    ),
+  );
+  $variables = array(
+    'items' => array(
+      '<b>Visa</b>  4444333322221111',
+      '<b>MasterCard</b> 5404000000000001',
+      '<b>Visa Debit</b> 4462000000000003',
+      '<b>Debit MasterCard</b> 5573470089010012',
+      '<b>American Express</b> 374200000000004',
+      '<b>JCB</b> 3569990000000009',
+      '<b>Diners</b> 36000000000008',
+    ),
+    'type' => 'ol',
+  );
+
+  $form['test']['cards_info'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Test cards numbers'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['test']['cards_info']['cards_no'] = array(
+    '#markup' => theme('item_list', $variables) . t('CVV is 3 for all but amex is 4'),
+  );
+  $form['test']['terminal_id'] = array(
+    '#type' => 'select',
+    '#title' => t('Test mode currency'),
+    '#default_value' => $settings['test']['terminal_id'],
+    '#options' => array(
+      '33001' => t('USD'), 
+      '33002' => t('CAD'), 
+      '33003' => t('EUR'), 
+      '33004' => t('GBP'), 
+      '36001' => t('Multi Currency'), 
+    ),
+  );
+  $form['live'] = array(
+    '#type' => 'container',
+    '#title' => t('Live terminal info'),
+    '#states' => array(
+      'visible' => array(
+        ':input[id="edit-parameter-payment-method-settings-payment-method-settings-mode"]' => array('value' => 'live'),
+      ),
+    ),
+  );
+  $form['live']['currency'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Currency'),
+    '#default_value' => $settings['live']['currency'],
+  );
+  $form['live']['terminal_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Terminal ID'),
+    '#default_value' => $settings['live']['terminal_id'],
+  );
+  $form['live']['secret'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Secret'),
+    '#default_value' => $settings['live']['secret'],
+  );
+    $form['card_types'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Limit accepted credit cards to the following types'),
+    '#description' => t('If you want to limit acceptable card types, you should only select those supported by your merchant account.') . '<br />' . t('If none are checked, any credit card type will be accepted.'),
+    '#options' => commerce_payment_credit_card_types(),
+    '#default_value' => $settings['card_types'],
+  );
+  if (module_exists('commerce_globalone_terminal')) {
+  $form['terminal'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('GlobalONE Terminal Payment'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+    $form['terminal']['terminal_path'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Terminal path'),
+      '#default_value' => $settings['terminal']['terminal_path'],
+      '#required' => TRUE,
+    );
+  }
+  $form['log'] = array(
+  '#type' => 'checkboxes',
+  '#title' => t('Log the following messages for debugging'),
+  '#options' => array(
+    'request' => t('API request messages'),
+    'response' => t('API response messages'),
+  ),
+  '#default_value' => $settings['log'],
+  );
+
   return $form;
 }
 
 /**
  * Payment method callback: checkout form.
  */
-function commerce_globalone_cc_submit_form($payment_method, $pane_values, $checkout_pane, $order, $owner = FALSE) {
+function commerce_globalone_cc_submit_form($pane_values, $checkout_pane, $order, $owner = FALSE) {
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
 
   // Prepare the fields to include on the credit card form.
@@ -69,6 +194,7 @@ function commerce_globalone_cc_submit_form($payment_method, $pane_values, $check
   }
 
   // Add the credit card types array if necessary.
+  /* //move to validation.....
   if (isset($payment_method['settings']['card_types'])) {
     $card_types = array_diff(array_values($payment_method['settings']['card_types']), array(0));
 
@@ -76,7 +202,7 @@ function commerce_globalone_cc_submit_form($payment_method, $pane_values, $check
       $fields['type'] = $card_types;
     }
   }
-
+   */
   return commerce_payment_credit_card_form($fields);
 }
 
@@ -91,7 +217,6 @@ function commerce_globalone_cc_submit_form_validate($payment_method, $pane_form,
   $settings = array(
     'form_parents' => array_merge($form_parents, array('credit_card')),
   );
-
   if (!commerce_payment_credit_card_validate($pane_values['credit_card'], $settings)) {
     return FALSE;
   }
@@ -126,7 +251,9 @@ function commerce_globalone_new_transaction($transaction_data) {
  * Payment method callback: checkout form submission.
  */
 function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge = NULL) {
+   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
   $payment_settings = $payment_method['settings'];
+   dpm($payment_settings);
   $credit_card = $pane_values['credit_card'];
   // Format order total for transaction.
   if (!isset($charge)) {
@@ -134,22 +261,38 @@ function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $
     $charge = commerce_line_items_total($wrapper->commerce_line_items);
   }
   
-
+  $params = array();
   $params['ORDERID'] = $order->order_id;
-  $params['AMOUNT'] = $charge['amount'];
+  $params['AMOUNT'] = commerce_currency_amount_to_decimal($charge['amount'],$charge['currency_code']) ;
   $params['CURRENCY'] = $charge['currency_code'];
   $params['CARDNUMBER'] = $credit_card['number'];
   $params['CARDHOLDERNAME'] = $credit_card['owner'];
   $params['MONTH'] = $credit_card['exp_month'];
   $params['YEAR'] = $credit_card['exp_year'];
   $params['CVV'] = $credit_card['code'];
-  $globalone_post = new CommerceGlobalonePost('https://testpayments.globalone.me/merchant/xmlpayment', $params);
+
+  // Credit card type.
+  if (empty($credit_card['valid_types'])) {
+    $credit_card_types =  commerce_payment_credit_card_types();
+    $credit_card['valid_types'] =  array_keys($credit_card_types);
+  }
+  $params['CARDTYPE'] = commerce_payment_validate_credit_card_type($credit_card['number'], $credit_card['valid_types']);
+
+  if ($payment_settings['mode'] == 'live') {
+    $terminal = array(
+      'url' => GLOBALONE_LIVE_URL,
+      'currency' => $payment_settings['live']['currency'],
+      'terminal_id' => $payment_settings['live']['terminal_id'],
+      'secret' => $payment_settings['live']['secret'],
+      'mode' => 'live',
+    );
+  }
+  else {
+    $terminal = _commmerce_globalone_get_test_terminal_info($payment_settings['test']['terminal_id']);
+  }
+  $globalone_post = new CommerceGlobalonePost($terminal, $params);
   $r = $globalone_post->sendPayment();
   dpm($r);
-
-
-
-
 
   $transaction = array(
     'charge' => $charge,
@@ -162,4 +305,45 @@ function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $
 
 
 
+}
+
+function _commmerce_globalone_get_test_terminal_info($terminal_id) {
+  $test_terminals = array(
+    '33001' => array(
+      'url' => GLOBALONE_TEST_URL,
+      'terminal_id' => '33001',
+      'currency' => 'USD',
+      'secret' => 'SandboxSecret001',
+      'mode' => 'test',
+    ),
+    '33002' => array(
+      'url' => GLOBALONE_TEST_URL,
+      'terminal_id' => '33002',
+      'currency' => 'CAD',
+      'secret' => 'SandboxSecret002',
+      'mode' => 'test',
+    ),
+    '33003' => array(
+      'url' => GLOBALONE_TEST_URL,
+      'terminal_id' => '33003',
+      'currency' => 'EUR',
+      'secret' => 'SandboxSecret003',
+      'mode' => 'test',
+    ),
+    '33004' => array(
+      'url' => GLOBALONE_TEST_URL,
+      'terminal_id' => '33004',
+      'currency' => 'GBP',
+      'secret' => 'SandboxSecret004',
+      'mode' => 'test',
+    ),
+    '36001' => array(
+      'url' => GLOBALONE_TEST_URL,
+      'terminal_id' => '36001',
+      'currency' => 'MCP',
+      'secret' => 'SandboxSecret001',
+      'mode' => 'test',
+    ),
+  );
+   return $test_terminals[$terminal_id];
 }
