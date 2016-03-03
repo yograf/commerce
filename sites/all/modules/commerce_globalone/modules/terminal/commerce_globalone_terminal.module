@@ -23,52 +23,19 @@ function commerce_globalone_terminal_menu() {
  * Load all enabled globalone paymnet method instanses.
  */
 function _commerce_globalone_terminal_globalone_payment_methods() {
-$cached_ids = &drupal_static(__FUNCTION__, array());
-  $method_id = 'globalone';
-  if (empty($cached_ids)) {
-    $cached_ids = array();
-
-    // load all rules ... no easier way
-    $rules_configs = rules_config_load_multiple(FALSE);
-
-    // find all rules with an action to enable this method
-    foreach ($rules_configs as $rule_name => $rule) {
-      // Only rules and sub-types have actions.
-      if (!($rule instanceof Rule)) {
-        continue;
-      }
-
-      // fast skip if rule does not depend on commerce_payment
-      if (!isset($rule->dependencies) || !in_array('commerce_payment', $rule->dependencies)) {
-        continue;
-      }
-
-      foreach ($rule->actions() as $action) {
-        // skip any actions that are not simple rules actions, ie loops
-        if (!($action instanceof RulesAction)) {
-          continue;
-        }
-
-        if ($action->getElementName() == 'commerce_payment_enable_' . $method_id && $rule->active) {
-          $instance_id = commerce_payment_method_instance_id($method_id, $rule);
-          $cached_ids[$instance_id] = $rule->label;
-          continue 2; // skip to next rule
-        }
-      }
-    }
+  $fake_order = new stdClass();
+  $fake_order->payment_methods = array();
+  rules_invoke_all('commerce_payment_methods', $fake_order);
+  $commerce_payment_methods = $fake_order->payment_methods;
+  $globalone_methods = array();
+  foreach ($commerce_payment_methods as $id =>  $method) {
+    if (strpos($id, 'globalone|') !== FALSE) {
+      $rule = rules_config_load($method['rule_name']);
+      $globalone_methods[$id] = $rule->label; 
+    } 
   }
 
-  /*
-  if (!empty($cached_ids[$method_id])) {
-    foreach ($cached_ids[$method_id] as $instance_id => $instance_active) {
-      if ($instance_active) {
-        $instances[$instance_id] = commerce_payment_method_instance_load($instance_id);
-      }
-    }
-  }
-*/ 
-
-  return $cached_ids;
+  return $globalone_methods;
 
 
 }
@@ -169,7 +136,7 @@ function commerce_globalone_terminal_form($form, &$form_state) {
 function commerce_globalone_terminal_form_validate($form, &$form_state) {
   //$form_state['rebuild'] = TRUE;
   $order = $form_state['order'];
- // commerce_globalone_cc_submit_form_validate('globalone', $form['payment_terminal']['payment_details'], $form_state['values']['payment_details'], $order, array('payment_details'));
+  // commerce_globalone_cc_submit_form_validate('globalone', $form['payment_terminal']['payment_details'], $form_state['values']['payment_details'], $order, array('payment_details'));
 
 }
 
@@ -224,7 +191,7 @@ function commerce_globalone_terminal_form_submit($form, &$form_state) {
 
   commerce_globalone_terminal_add_line_item_to_order($order, $charge, $description);
 
-// maybe move to validation
+  // maybe move to validation
   // Load payment method instance info into same $payment_method.
   $payment_method = commerce_payment_method_instance_load($payment_method);
 

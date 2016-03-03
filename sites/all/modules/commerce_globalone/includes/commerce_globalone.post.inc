@@ -11,7 +11,8 @@ class CommerceGlobalonePost {
   public $_normalizedPaymentParams;
   public $_normalizedPaymentReponse;
   public $mode;
-  public $_log = FALSE;
+  public $_logRequest = FALSE;
+  public $_logResponse = FALSE;
 
   public function __construct($terminal,$paymentParams) {
     $this->_terminal = $terminal;
@@ -23,18 +24,28 @@ class CommerceGlobalonePost {
   public function sendPayment() {
     $curl = new CommerceGlobaloneCurl();
     $format = new CommerceGlobaloneFormat($this->_paymentParams,$this->_terminal,$this->createHash(),$this->_postDateTime);
-    //$this->_normalizedPaymentParams = $format->getNormalizedPaymentParams();
+    $this->_normalizedPaymentParams = $format->getNormalizedPaymentParams();
     $XML = $format->getXML();
-    if ($this->_log) {
-      watchdog('dfd', $XML);
+    if ($this->_logRequest) {
+      watchdog('commerce_globalone', 'GlobalONE request to @url: !param', array('@url' => $this->_terminal['url'], '!param' => '<pre>' . check_plain(print_r($XML, TRUE)) . '</pre>'), WATCHDOG_DEBUG);
     } 
-    dpm($XML);
+
     $resp = $curl->curlXmlRequest($this->_terminal['url'], $XML);
-    dpm($resp);
-    return;
-    $resp['STATUS'] = $this->controlResponseHash($normalizedPaymentReponse);
+    
+    if ($this->_logResponse) {
+      watchdog('commerce_globalone', 'GlobalONE response: !param', array('!param' => '<pre>' . check_plain(print_r($resp, TRUE)) . '</pre>'), WATCHDOG_DEBUG);
+    }
+    $resp['STATUS'] = $this->controlResponseHash($resp);
     return $resp;
 
+  }
+
+  public function logRequest() {
+    $this->_logRequest = TRUE;
+  }
+
+  public function logResponse() {
+    $this->_logResponse = TRUE;
   }
 
   public function getXML(){
@@ -60,23 +71,23 @@ class CommerceGlobalonePost {
   }
 
 
-  public function buildResponseHash(){
+  public function buildResponseHash() {
     $reponse = $this->_normalizedPaymentReponse;
     $payment = $this->_paymentParams;
     $stringToHash = '';
-    $stringToHash .= $this->_terminal;
+    $stringToHash .= $this->_terminal['terminal_id'];
     $stringToHash .= $reponse['UNIQUEREF'];
     $stringToHash .= $payment['AMOUNT'];
     $stringToHash .= $reponse['DATETIME'];
     $stringToHash .= $reponse['RESPONSECODE'];
     $stringToHash .= $reponse['RESPONSETEXT'];
-    $stringToHash .= $this->_secret;
+    $stringToHash .= $this->_terminal['secret'];
     $this->_responseHash = md5($stringToHash);
     return md5($stringToHash);
   }
 
 
-  public function controlResponseHash($responseHash){
+  public function controlResponseHash($responseHash) {
     if(isset($responseHash['ERRORSTRING'])) {
       return false;
     }
