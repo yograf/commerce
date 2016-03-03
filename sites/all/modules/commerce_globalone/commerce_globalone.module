@@ -9,15 +9,7 @@ define('GLOBALONE_TEST_URL', 'https://testpayments.globalone.me/merchant/xmlpaym
 define('GLOBALONE_LIVE_URL', 'https://payments.globalone.me/merchant/xmlpayment');
 
 
-/**
- * Implements hook_menu().
- */
-function commerce_globalone_menu() {
-  $items = array();
 
-
-  return $items;
-}
 
 /**
  * Implements hook_commerce_payment_method_info().
@@ -36,6 +28,9 @@ function commerce_globalone_commerce_payment_method_info() {
   return $payment_methods;
 }
 
+/**
+ * GlobalONE default settings.
+ */
 function commerce_globalone_cc_default_settings() {
   return array(
     'mode' => 'test',
@@ -59,8 +54,9 @@ function commerce_globalone_cc_default_settings() {
  * Payment method callback: settings form.
  */
 function commerce_globalone_cc_settings_form($settings = NULL) {
-  $settings = (array) $settings + commerce_globalone_cc_default_settings();
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+
+  $settings = (array) $settings + commerce_globalone_cc_default_settings();
 
   $form = array();
 
@@ -222,6 +218,9 @@ function commerce_globalone_cc_submit_form_validate($payment_method, $pane_form,
   }
 }
 
+/**
+ * Create new transaction.
+ */
 function commerce_globalone_new_transaction($transaction_data) {
 
     $transaction = commerce_payment_transaction_new('globalone', $transaction_data['order_id']);
@@ -251,9 +250,8 @@ function commerce_globalone_new_transaction($transaction_data) {
  * Payment method callback: checkout form submission.
  */
 function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge = NULL) {
-   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+  module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
   $payment_settings = $payment_method['settings'];
-   dpm($payment_settings);
   $credit_card = $pane_values['credit_card'];
   // Format order total for transaction.
   if (!isset($charge)) {
@@ -290,9 +288,11 @@ function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $
   else {
     $terminal = _commmerce_globalone_get_test_terminal_info($payment_settings['test']['terminal_id']);
   }
+
   $globalone_post = new CommerceGlobalonePost($terminal, $params);
-  $r = $globalone_post->sendPayment();
-  dpm($r);
+
+  $result = $globalone_post->sendPayment();
+  dpm($result);
 
   $transaction = array(
     'charge' => $charge,
@@ -307,6 +307,17 @@ function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $
 
 }
 
+/**
+ * Return test terminals.
+ *
+ * @param $terminal_id
+ *  The terminal id to get details for.
+ *
+ * @return
+ *  Array with 'url', currency
+ *
+ *
+ */
 function _commmerce_globalone_get_test_terminal_info($terminal_id) {
   $test_terminals = array(
     '33001' => array(

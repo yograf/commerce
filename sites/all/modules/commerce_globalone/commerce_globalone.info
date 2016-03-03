@@ -9,3 +9,4 @@ core = 7.x
 
 files[] = includes/commerce_globalone.curl.inc
 files[] = includes/commerce_globalone.format.inc
+files[] = includes/commerce_globalone.post.inc
