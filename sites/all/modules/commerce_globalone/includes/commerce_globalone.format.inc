@@ -293,6 +293,7 @@ return $date;
     $out['TERMINALTYPE'] = 2;
     $out['TRANSACTIONTYPE'] = 7;
     $out['CVV'] = $params['CVV'];
+    $out['DESCRIPTION'] = $params['DESCRIPTION'];
 
     $this->_normalizedPaymentParams = $out;
 

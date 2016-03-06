@@ -30,8 +30,30 @@ function _commerce_globalone_terminal_globalone_payment_methods() {
   $globalone_methods = array();
   foreach ($commerce_payment_methods as $id =>  $method) {
     if (strpos($id, 'globalone|') !== FALSE) {
+      if ($method['settings']['mode'] == 'live') {
+        $currency = $method['settings']['live']['currency'];
+      }
+      else {
+        switch ($method['settings']['test']['terminal_id']) {
+        case '33001':
+          $currency = 'USD';
+          break; 
+        case '33002':
+          $currency = 'CAD';
+          break; 
+        case '33003':
+          $currency = 'EUR';
+          break; 
+        case '33004':
+          $currency = 'GBP';
+          break; 
+        case '36001':
+          $currency = 'MCP';
+          break; 
+        }
+      }
       $rule = rules_config_load($method['rule_name']);
-      $globalone_methods[$id] = $rule->label; 
+      $globalone_methods[$id] = "$currency: $rule->label"; 
     } 
   }
 
@@ -112,12 +134,30 @@ function commerce_globalone_terminal_form($form, &$form_state) {
     '#type' => 'select',
     '#options' => $options,
     '#default_value' => $default_currency_code,
-    '#suffix' => '</div>',
+    '#prefix' => '<span id="replace_currency">',
+    '#suffix' => '</span></div>',
   );
+  $globalone_payment_methods = _commerce_globalone_terminal_globalone_payment_methods();
+  if (!empty($form_state['values']['payment_method'])) {
+    $payment_method_label = $globalone_payment_methods[$form_state['values']['payment_method']];
+  }
+  else {
+    $payment_method_label = reset($globalone_payment_methods);
+  }
+  $payment_currency = explode(':', $payment_method_label);
+  $payment_currency = reset($payment_currency);
+  if ($payment_currency != 'MCP') {
+    $form['payment_terminal']['currency_code']['#disabled'] = TRUE;
+  }
+  $form['payment_terminal']['currency_code']['#value'] = $payment_currency;
   $form['payment_terminal']['payment_method'] = array(
     '#type' => 'select',
     '#title' => t('Payment method'),
-    '#options' => _commerce_globalone_terminal_globalone_payment_methods(),
+    '#options' => $globalone_payment_methods,
+    '#ajax' => array(
+      'callback' => 'globalone_terminal_terminal_callback',
+      'wrapper' => 'replace_currency',
+    ),
   ); 
   $form['payment_terminal']['description'] = array(
     '#type' => 'textfield',
@@ -132,6 +172,11 @@ function commerce_globalone_terminal_form($form, &$form_state) {
     '#value' => t('Processs'),
   );
   return $form;
+}
+
+function globalone_terminal_terminal_callback($form, $form_state) {
+  return $form['payment_terminal']['currency_code'];
+
 }
 function commerce_globalone_terminal_form_validate($form, &$form_state) {
   //$form_state['rebuild'] = TRUE;
@@ -198,5 +243,5 @@ function commerce_globalone_terminal_form_submit($form, &$form_state) {
 
   $details_form = !empty($form['payment_terminal']['payment_details']) ? $form['payment_terminal']['payment_details'] : array();
   $details_values = !empty($payment_details) ? $payment_details : array();
-  $result = commerce_globalone_cc_submit_form_submit($payment_method, $details_form, $details_values, $order, $charge);
+  $result = commerce_globalone_cc_submit_form_submit($payment_method, $details_form, $details_values, $order, $charge, $description);
 }

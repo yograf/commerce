@@ -125,8 +125,15 @@ function commerce_globalone_cc_settings_form($settings = NULL) {
       ),
     ),
   );
+  // Build a currency options list from all enabled currencies.
+  $options = array();
+
+  foreach (commerce_currencies(TRUE) as $currency_code => $currency) {
+    $options[$currency_code] = check_plain($currency['code']);
+  }
   $form['live']['currency'] = array(
-    '#type' => 'textfield',
+    '#type' => 'select',
+    '#options' => $options,
     '#title' => t('Currency'),
     '#default_value' => $settings['live']['currency'],
   );
@@ -250,7 +257,7 @@ function commerce_globalone_cc_submit_form_validate($payment_method, $pane_form,
 /**
  * Payment method callback: checkout form submission.
  */
-function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge = NULL) {
+function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge = NULL, $desc = '') {
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
   $payment_settings = $payment_method['settings'];
   $credit_card = $pane_values['credit_card'];
@@ -259,7 +266,6 @@ function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $
     $wrapper = entity_metadata_wrapper('commerce_order', $order);
     $charge = commerce_line_items_total($wrapper->commerce_line_items);
   }
-
   $params = array();
   $params['ORDERID'] = $order->order_id;
   $params['AMOUNT'] = commerce_currency_amount_to_decimal($charge['amount'],$charge['currency_code']) ;
@@ -269,6 +275,7 @@ function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $
   $params['MONTH'] = $credit_card['exp_month'];
   $params['YEAR'] = $credit_card['exp_year'];
   $params['CVV'] = $credit_card['code'];
+  $params['DESCRIPTION'] = $desc;
 
   // Credit card type.
   if (empty($credit_card['valid_types'])) {
@@ -336,7 +343,10 @@ function commerce_globalone_cc_submit_form_submit($payment_method, $pane_form, $
   // Save the transaction information.
   commerce_payment_transaction_save($transaction);
 
-  if ($response['RESPONSECODE'] != 'A') {
+  if ($response['RESPONSECODE'] == 'A') {
+    drupal_set_message(t('Order !url created.', array('!url' => l($order->order_id, "admin/commerce/orders/$order->order_id"))));
+  }
+  else {
     drupal_set_message(t('We received the following error processing your card. Please enter your information again or try a different card.'), 'error');
     drupal_set_message($transaction->message, 'error');
     return FALSE;
