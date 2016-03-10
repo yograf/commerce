@@ -2,6 +2,7 @@
 
 
 $options['sites'] = array (
+  0 => 'dev.commerce.devshop.syneronapi.us',
 );
 $options['profiles'] = array (
   0 => 'commerce_kickstart',
@@ -1456,6 +1457,7 @@ $options['packages'] = array (
           array (
             0 => 'includes/commerce_globalone.curl.inc',
             1 => 'includes/commerce_globalone.format.inc',
+            2 => 'includes/commerce_globalone.post.inc',
           ),
           'version' => NULL,
           'php' => '5.2.4',
@@ -2216,6 +2218,7 @@ $options['packages'] = array (
           array (
             0 => 'includes/commerce_globalone.curl.inc',
             1 => 'includes/commerce_globalone.format.inc',
+            2 => 'includes/commerce_globalone.post.inc',
           ),
           'version' => NULL,
           'php' => '5.2.4',
