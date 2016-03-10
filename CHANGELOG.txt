@@ -1,6 +1,6 @@
 
 Drupal 7.41, 2015-10-21
------------------------
+---------------------yurty--
 - Fixed security issues (open redirect). See SA-CORE-2015-004.
 
 Drupal 7.40, 2015-10-14
