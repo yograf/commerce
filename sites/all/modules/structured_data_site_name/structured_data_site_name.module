@@ -1,0 +1,15 @@
+<?php
+
+/**
+ * @file
+ * 
+ */
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function structured_data_site_name_ctools_plugin_directory($module, $plugin) {
+  if ($module == 'structured_data') {
+    return 'plugins/' . $plugin;
+  }
+}

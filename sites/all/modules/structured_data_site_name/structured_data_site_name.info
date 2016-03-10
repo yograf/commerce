@@ -1,0 +1,5 @@
+name = SD site name
+description = "test asdlfsad asdfdsaf"
+core = 7.x
+
+dependencies[] = structured_data

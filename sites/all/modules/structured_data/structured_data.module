@@ -1,0 +1,316 @@
+<?php
+
+/**
+ * Implements hook_help().
+ */
+function structured_data_help($path, $arg) {
+  switch ($path) {
+  case 'admin/help#structured-data':
+    return '<p>' . t('This is the Help page for the Structured Data module') . '</p>';
+  }
+}
+
+
+function structured_data_permission() {
+  return array(
+    'administer structured data' => array(
+      'title' => t('Administer structured data'),
+      'description' => t('Perform administration tasks for structured data.'),
+    ),
+  );
+} 
+
+function structured_data_form($form, &$form_state, $name) {
+  $plugin = structured_data_get_snippet_plugin($name);
+  if (!$plugin) {
+    return;
+  }
+  $callback = $plugin['configure'];
+
+  if (!function_exists($callback)) {
+    return;
+  }
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#weight' => 100,
+  );
+  $form = $form + $callback();
+
+  return $form;
+
+}
+
+function structured_data_form_submit($form, &$form_state) {
+
+}
+
+
+
+
+function structured_data_page() {
+
+  return 'dfasdf';
+
+}
+
+
+function _structured_data_check_path_match($pages) {
+  dpm('ddd');
+  $path = drupal_strtolower(drupal_get_path_alias($_GET['q']));
+  // Compare the lowercase internal and lowercase path alias (if any).
+  $page_match = drupal_match_path($path, $pages);
+  if ($path != $_GET['q']) {
+    $page_match = $page_match || drupal_match_path($_GET['q'], $pages);
+  }
+
+  return $page_match;
+}
+
+/**
+ * Implements template_preprocess_html().
+ *
+ * Add the necesarry json-ld
+ */
+function structured_data_preprocess_html(&$vars) {
+_structured_data_check_path_match('estore');
+  if (_structured_data_check_path_match('estore')) {
+  
+  }
+  $json = '';
+  ctools_include('export');
+  $snippets = ctools_export_crud_load_all('structured_data_preset');
+  foreach ($snippets as $snippet) {
+    if (!empty($snippet->disabled)) {
+      continue;
+    }
+    $json .= $snippet->mydata;
+  }
+
+
+  $json_ld_script = array(
+    '#tag' => 'script',
+    '#attributes' => array('type' => 'application/ld+json'),
+    '#value' => $json,
+  );
+
+  drupal_add_html_head($json_ld_script, 'structured_data_json_ld');
+}
+
+function structured_data_add_site_name_script()
+{
+  $data = structured_data_get_setting('site_name');
+  return array(
+    'name' => $data['site_name'],
+    'alternateName' => $data['alternative_site_name'],
+    'url' => $data['canonical_url']
+  );
+}
+
+function structured_data_add_site_logo_script()
+{
+  $data = structured_data_get_setting('site_logo');
+  return array(
+    'logo' => $data['site_logo'],
+  );
+}
+
+/**
+ * Retrieves a setting for the structured data given
+ * @param  $setting_name The name of the setting to be retrieved.
+ * @return The value of the requested setting, NULL if the setting does not exist.
+ */
+function structured_data_get_setting($setting_name)
+{
+  switch ($setting_name) {
+  case 'site_name':
+    //Pass no arguments (or NULL for both) to retrieve the currently stored elements.
+    $head_elements = drupal_add_html_head();
+
+    if(!empty($head_elements['metatag_canonical'])) {
+      $canonical_url = $head_elements['metatag_canonical']['#value'];
+    }
+
+    if(variable_get('structured_data_site_name_default', FALSE)) {
+      $site_name = variable_get('site_name','');
+    }
+    else
+    {
+      $site_name = variable_get('structured_data_site_name_custom','');
+    }
+
+    $alternative_site_name = variable_get('structured_data_site_name_alternative', '');
+    if(empty($alternative_site_name)) {
+      $alternative_site_name = $site_name;
+    }
+    return array(
+      'site_name' => $site_name,
+      'alternative_site_name' => $alternative_site_name,
+      'canonical_url' => $canonical_url,
+    );
+    break;
+  case 'site_logo':
+    if(variable_get('structured_data_site_logo_default', TRUE)) {
+      $site_logo = theme_get_setting('logo');
+    }
+    else
+    {
+      $logo = file_load(variable_get('structured_data_site_logo_custom'));
+      $site_logo = file_create_url($logo->uri);
+    }
+    return array(
+      'site_logo' => $site_logo,
+    );
+    break;
+  }
+
+}
+
+function structured_data_main_page()
+{
+  $items['items'] = array(
+    l('Structured data (Rich Snippets) - Site Name in Search Results', 'admin/config/structured-data/knowledge-graph/site-name'),
+    l('Structured data (Rich Snippets) - Your Logo', 'admin/config/structured-data/knowledge-graph/logos'),
+  );
+  return theme('item_list', $items);
+}
+
+
+/**
+ * Implements hook_ctools_plugin_type().
+ */
+function structured_data_ctools_plugin_type() {
+  return array(
+    'snippet' => array(
+      'label' => 'Snippet',
+      'use hooks' => FALSE,
+      'process' => 'structured_data_plugin_process',
+    ),
+  );
+}
+
+
+/**
+ * Implementation of hook_ctools_plugin_api().
+ *
+ * Tell CTools that we support the default_mymodule_presets API.
+ */
+function structured_data_ctools_plugin_api($owner, $api) {
+  if ($owner == 'structured_data' && $api == 'default_mymodule_presets') {
+    return array('version' => 1);
+  }
+}
+
+function structured_data_json_to_form($container, $snippet_array) {
+
+  $container = array(
+    '#type' => 'container',
+  );
+  foreach ($snippet_array as $id =>  $s) {
+    if (is_array($s)) {
+      $container[$id]  = structured_data_json_to_form($id, $s); 
+    }
+    else {
+      if ($id[0] == '@') {
+        $container[$id] = array(
+          '#type' => 'value',
+          '#value' => $s,
+        );
+      } 
+      else {
+        $container[$id] = array(
+          '#type' => 'textfield',
+          '#default_value' => $s,
+          '#title' => $id,
+          '#required' => true,
+        );
+      }
+    }
+  }
+  return $container;
+}
+
+/**
+ * Implementation of hook_default_mymodule_preset().
+ * 
+ * Provide a couple of default presets.
+ */
+function structured_data_default_structured_data_preset() {
+  $export = array();
+
+  $preset = new stdClass;
+  $preset->api_version = 1;
+  $preset->disabled = TRUE;
+  $preset->name = 'sitelinks_search';
+  $preset->admin_title = 'Sitelinks Search';
+  $preset->mydata = '{
+  "@context": "http://schema.org",
+    "@type": "WebSite",
+    "url": "https://www.example.com/",
+    "potentialAction": {
+    "@type": "SearchAction",
+      "target": "https://query.example.com/search?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+}
+}';
+$preset->snippet = 'site_name';
+$export['structured_data_default_preset'] = $preset;
+
+return $export;
+}
+
+/**
+ * Implementation of hook_ctools_plugin_directory().
+ */
+function structured_data_ctools_plugin_directory($module, $plugin) {
+  return 'plugins/' . $plugin;
+}
+
+
+
+
+/**
+ * Add defaults values to the validator plugins.
+ */
+function structured_data_plugin_process(&$plugin, $info) {
+  if (!isset($plugin['elements'])) {
+    $plugin['view'] = $plugin['module'] . '_' . $plugin['name'] . '_elements';
+  }
+
+  // Add a block form function
+  if (!isset($plugin['configure'])) {
+    $plugin['configure'] = $plugin['module'] . '_' . $plugin['name'] . '_configure';
+  }
+
+  // Add a block save function
+  if (!isset($plugin['save'])) {
+    $plugin['save'] = $plugin['module'] . '_' . $plugin['name'] . '_save';
+  }
+}
+/**
+ * Include CTools plugins and get all entity validator plugins.
+ *
+ * @return array
+ *   All plugins relate to entity validator.
+ */
+function structured_data_get_snippet_plugins() {
+  ctools_include('plugins');
+  return ctools_get_plugins('structured_data', 'snippet');
+}
+
+/**
+ * Include CTools plugins and get the specified entity validator plugin.
+ *
+ * @param string $plugin_name
+ *   If provided this function only returns the selected plugin.
+ *
+ * @return array
+ *   The selected plugin for entity validator.
+ */
+function structured_data_get_snippet_plugin($plugin_name) {
+  ctools_include('plugins');
+  return ctools_get_plugins('structured_data', 'snippet', $plugin_name);
+}
+
+
+
