@@ -1,24 +1,5 @@
 
-Drupal 7.41, 2015-10-21
----------------------yurty--
-- Fixed security issues (open redirect). See SA-CORE-2015-004.
-
-Drupal 7.40, 2015-10-14
------------------------
-- Made Drupal's code for parsing .info files run much faster and use much less
-  memory.
-- Prevented drupal_http_request() from returning an error when it receives a
-  201 through 206 HTTP status code.
-- Added support for autoloading traits via the registry on sites running PHP
-  5.4 or higher.
-- Allowed the user-picture.tpl.php theme template to have HTML classes besides
-  the default "user-picture" class printed in it (markup change).
-- Fixed the URL text filter to convert e-mail addresses with plus signs into
-  mailto: links.
-- Added alternate text to file icons displayed by the File module, to improve
-  accessibility (string change, and minor API addition to theme_file_icon()).
-- Changed one-time login link failure messages to be displayed as errors or
-  warnings as appropriate, rather than as regular status messages (minor UI
+fasdfdf
   change and data structure change).
 - Changed the default settings.php configuration to exclude private files from
   the "404_fast_paths" behavior.
